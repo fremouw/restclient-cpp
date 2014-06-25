@@ -26,6 +26,15 @@ void RestClient::setAuth(const std::string& user,const std::string& password){
   RestClient::user_pass.clear();
   RestClient::user_pass += user+":"+password;
 }
+
+std::string RestClient::cookies = std::string();
+void RestClient::clearCookies(){
+    RestClient::cookies.clear();
+}
+void RestClient::setCookies(const std::string& cookies){
+    RestClient::cookies.clear();
+    RestClient::cookies = cookies;
+}
 /**
  * @brief HTTP GET method
  *
@@ -50,6 +59,11 @@ RestClient::response RestClient::get(const std::string& url)
       curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
       curl_easy_setopt(curl, CURLOPT_USERPWD, RestClient::user_pass.c_str());
     }
+
+    if(RestClient::cookies.length()>0){
+      curl_easy_setopt(curl, CURLOPT_COOKIE, RestClient::cookies.c_str());
+    }
+
     /** set user agent */
     curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
     /** set query URL */
@@ -110,6 +124,11 @@ RestClient::response RestClient::post(const std::string& url,
       curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
       curl_easy_setopt(curl, CURLOPT_USERPWD, RestClient::user_pass.c_str());
     }
+      
+    if(RestClient::cookies.length()>0){
+      curl_easy_setopt(curl, CURLOPT_COOKIE, RestClient::cookies.c_str());
+    }
+
     /** set user agent */
     curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
     /** set query URL */
@@ -185,6 +204,11 @@ RestClient::response RestClient::put(const std::string& url,
       curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
       curl_easy_setopt(curl, CURLOPT_USERPWD, RestClient::user_pass.c_str());
     }
+      
+    if(RestClient::cookies.length()>0){
+      curl_easy_setopt(curl, CURLOPT_COOKIE, RestClient::cookies.c_str());
+    }
+
     /** set user agent */
     curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
     /** set query URL */
@@ -258,6 +282,11 @@ RestClient::response RestClient::del(const std::string& url)
       curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
       curl_easy_setopt(curl, CURLOPT_USERPWD, RestClient::user_pass.c_str());
     }
+      
+    if(RestClient::cookies.length()>0){
+      curl_easy_setopt(curl, CURLOPT_COOKIE, RestClient::cookies.c_str());
+    }
+
     /** set user agent */
     curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
     /** set query URL */

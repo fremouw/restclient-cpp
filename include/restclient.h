@@ -25,11 +25,14 @@ class RestClient
     typedef std::map<std::string, std::string> headermap;
 
     /** response struct for queries */
-    typedef struct
+    typedef struct response_s
     {
       int code;
       std::string body;
       headermap headers;
+        
+      response_s() : code(0), body(""), headers()
+      {}
     } response;
     /** struct used for uploading data */
     typedef struct

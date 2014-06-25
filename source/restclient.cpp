@@ -7,7 +7,7 @@
 /*========================
          INCLUDES
   ========================*/
-#include "include/restclient.h"
+#include "restclient.h"
 
 #include <cstring>
 #include <string>
@@ -36,7 +36,7 @@ void RestClient::setAuth(const std::string& user,const std::string& password){
 RestClient::response RestClient::get(const std::string& url)
 {
   /** create return struct */
-  RestClient::response ret = {};
+  RestClient::response ret = RestClient::response();
 
   // use libcurl
   CURL *curl = NULL;
@@ -94,7 +94,7 @@ RestClient::response RestClient::post(const std::string& url,
                                       const std::string& data)
 {
   /** create return struct */
-  RestClient::response ret = {};
+  RestClient::response ret = RestClient::response();
   /** build content-type header string */
   std::string ctype_header = "Content-Type: " + ctype;
 
@@ -164,7 +164,7 @@ RestClient::response RestClient::put(const std::string& url,
                                      const std::string& data)
 {
   /** create return struct */
-  RestClient::response ret = {};
+  RestClient::response ret = RestClient::response();
   /** build content-type header string */
   std::string ctype_header = "Content-Type: " + ctype;
 
@@ -241,7 +241,7 @@ RestClient::response RestClient::put(const std::string& url,
 RestClient::response RestClient::del(const std::string& url)
 {
   /** create return struct */
-  RestClient::response ret = {};
+  RestClient::response ret = RestClient::response();
 
   /** we want HTTP DELETE */
   const char* http_delete = "DELETE";

@@ -31,9 +31,9 @@ std::string RestClient::cookies = std::string();
 void RestClient::clearCookies(){
     RestClient::cookies.clear();
 }
-void RestClient::setCookies(const std::string& cookies){
+void RestClient::setCookies(const std::string& _cookies){
     RestClient::cookies.clear();
-    RestClient::cookies = cookies;
+    RestClient::cookies = _cookies;
 }
 /**
  * @brief HTTP GET method

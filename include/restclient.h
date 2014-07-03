@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include "meta.h"
 #include <algorithm>
+#include <fstream>
 
 class RestClient
 {
@@ -24,14 +25,22 @@ class RestClient
      */
     typedef std::map<std::string, std::string> headermap;
 
+    
+    typedef struct request_s
+    {
+        headermap headers;
+        std::string url;
+    } request;
+    
     /** response struct for queries */
     typedef struct response_s
     {
       int code;
       std::string body;
       headermap headers;
+      std::ostream* file;
         
-      response_s() : code(0), body(""), headers()
+      response_s() : code(0), body(""), headers(), file(NULL)
       {}
     } response;
     /** struct used for uploading data */
@@ -50,7 +59,10 @@ class RestClient
     static void clearAuth();
     static void setAuth(const std::string& user,const std::string& password);
     // HTTP GET
+    static response get(const request& request);
+    static response get(const request& request, const std::ostream* outputFile);
     static response get(const std::string& url);
+    
     // HTTP POST
     static response post(const std::string& url, const std::string& ctype,
                          const std::string& data);

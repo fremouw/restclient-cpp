@@ -42,58 +42,96 @@ void RestClient::setCookies(const std::string& _cookies){
  *
  * @return response struct
  */
+RestClient::response RestClient::get(const RestClient::request& request)
+{
+    return RestClient::get(request, NULL);
+}
+
 RestClient::response RestClient::get(const std::string& url)
 {
-  /** create return struct */
-  RestClient::response ret = RestClient::response();
+    RestClient::request request;
+    
+    request.url = url;
 
-  // use libcurl
-  CURL *curl = NULL;
-  CURLcode res = CURLE_OK;
-
-  curl = curl_easy_init();
-  if (curl)
-  {
-    /** set basic authentication if present*/
-    if(RestClient::user_pass.length()>0){
-      curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-      curl_easy_setopt(curl, CURLOPT_USERPWD, RestClient::user_pass.c_str());
-    }
-
-    if(RestClient::cookies.length()>0){
-      curl_easy_setopt(curl, CURLOPT_COOKIE, RestClient::cookies.c_str());
-    }
-
-    /** set user agent */
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
-    /** set query URL */
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    /** set callback function */
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, RestClient::write_callback);
-    /** set data object to pass to callback function */
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ret);
-    /** set the header callback function */
-    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, RestClient::header_callback);
-    /** callback object for headers */
-    curl_easy_setopt(curl, CURLOPT_HEADERDATA, &ret);
-    /** perform the actual query */
-    res = curl_easy_perform(curl);
-    if (res != CURLE_OK)
-    {
-      ret.body = "Failed to query.";
-      ret.code = -1;
-      return ret;
-    }
-    long http_code = 0;
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-    ret.code = static_cast<int>(http_code);
-
-    curl_easy_cleanup(curl);
-    curl_global_cleanup();
-  }
-
-  return ret;
+    return RestClient::get(request, NULL);
 }
+
+RestClient::response RestClient::get(const RestClient::request& request, const std::ostream* outputFile)
+{
+    /** create return struct */
+    RestClient::response ret = RestClient::response();
+    
+    // use libcurl
+    CURL *curl = NULL;
+    CURLcode res = CURLE_OK;
+    struct curl_slist *headerChunk = NULL;
+    
+    curl = curl_easy_init();
+    if (curl)
+    {
+        /** set basic authentication if present*/
+        if(RestClient::user_pass.length()>0){
+          curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+          curl_easy_setopt(curl, CURLOPT_USERPWD, RestClient::user_pass.c_str());
+        }
+        
+        if(request.headers.size()>0){
+          headermap::const_iterator iterator;
+
+          for(iterator = request.headers.begin(); iterator != request.headers.end(); iterator++){
+            std::string value = iterator->first+": "+iterator->second;
+            
+            headerChunk = curl_slist_append(headerChunk, value.c_str());
+          }
+
+          curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerChunk);
+
+          if(request.headers.find("User-Agent") == request.headers.end()){
+            /** set user agent */
+            curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
+          }
+        } else {
+          /** set user agent */
+          curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
+        }
+
+        if(outputFile != NULL) {
+          ret.file = (std::ostream*)outputFile;
+        }
+
+        /** set query URL */
+        curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
+        /** set callback function */
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, RestClient::write_callback);
+        /** set data object to pass to callback function */
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ret);
+        /** set the header callback function */
+        curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, RestClient::header_callback);
+        /** callback object for headers */
+        curl_easy_setopt(curl, CURLOPT_HEADERDATA, &ret);
+        /** perform the actual query */
+        res = curl_easy_perform(curl);
+        if (res != CURLE_OK)
+        {
+            ret.body = "Failed to query.";
+            ret.code = -1;
+            return ret;
+        }
+        long http_code = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+        ret.code = static_cast<int>(http_code);
+        
+        curl_easy_cleanup(curl);
+        
+        if(headerChunk != NULL){
+            curl_slist_free_all(headerChunk);
+        }
+        curl_global_cleanup();
+    }
+    
+    return ret;
+}
+
 /**
  * @brief HTTP POST method
  *
@@ -335,7 +373,13 @@ size_t RestClient::write_callback(void *data, size_t size, size_t nmemb,
 {
   RestClient::response* r;
   r = reinterpret_cast<RestClient::response*>(userdata);
-  r->body.append(reinterpret_cast<char*>(data), size*nmemb);
+
+  // If there is a file stream set and open, use that.
+    if(r->file != NULL){
+    r->file->write(reinterpret_cast<char*>(data), size*nmemb);
+  } else {
+    r->body.append(reinterpret_cast<char*>(data), size*nmemb);
+  }
 
   return (size * nmemb);
 }

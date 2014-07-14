@@ -29,12 +29,26 @@ void RestClient::setAuth(const std::string& user,const std::string& password){
 
 std::string RestClient::cookies = std::string();
 void RestClient::clearCookies(){
-    RestClient::cookies.clear();
+  RestClient::cookies.clear();
 }
 void RestClient::setCookies(const std::string& _cookies){
-    RestClient::cookies.clear();
-    RestClient::cookies = _cookies;
+  RestClient::cookies.clear();
+  RestClient::cookies = _cookies;
 }
+
+int RestClient::TransferInfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow){
+  RestClientTransferInfo* info = (RestClientTransferInfo*)p;
+  int retValue = 0;
+
+  if(info != NULL){
+    RestClientTransferInfo* info = (RestClientTransferInfo*)p;
+    
+    retValue = info->UpdateTransferInfo(dltotal, dlnow, ultotal, ulnow);
+  }
+
+  return retValue;
+}
+
 /**
  * @brief HTTP GET method
  *
@@ -44,92 +58,175 @@ void RestClient::setCookies(const std::string& _cookies){
  */
 RestClient::response RestClient::get(const RestClient::request& request)
 {
-    return RestClient::get(request, NULL);
+  return RestClient::get(request, NULL);
 }
 
 RestClient::response RestClient::get(const std::string& url)
 {
-    RestClient::request request;
-    
-    request.url = url;
+  RestClient::request request;
 
-    return RestClient::get(request, NULL);
+  request.url = url;
+
+  return RestClient::get(request, NULL);
+}
+
+RestClient::response RestClient::get(const RestClient::request& request, const std::ostream* outputFile, const RestClientTransferInfo& info)
+{
+  /** create return struct */
+  RestClient::response ret = RestClient::response();
+
+  // use libcurl
+  CURL *curl = NULL;
+  CURLcode res = CURLE_OK;
+  struct curl_slist *headerChunk = NULL;
+
+  curl = curl_easy_init();
+  if (curl)
+  {
+    /** set basic authentication if present*/
+    if(RestClient::user_pass.length()>0){
+      curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+      curl_easy_setopt(curl, CURLOPT_USERPWD, RestClient::user_pass.c_str());
+    }
+    
+    if(request.headers.size()>0){
+      headermap::const_iterator iterator;
+      
+      for(iterator = request.headers.begin(); iterator != request.headers.end(); iterator++){
+        std::string value = iterator->first+": "+iterator->second;
+        
+        headerChunk = curl_slist_append(headerChunk, value.c_str());
+      }
+      
+      curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerChunk);
+      
+      if(request.headers.find("User-Agent") == request.headers.end()){
+        /** set user agent */
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
+      }
+    } else {
+      /** set user agent */
+      curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
+    }
+
+    // 
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, RestClient::TransferInfo);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &info);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    
+    if(outputFile != NULL){
+      ret.file = (std::ostream*)outputFile;
+    }
+    
+    /** do not install signal handlers */
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
+    /** set query URL */
+    curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
+    /** set callback function */
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, RestClient::write_callback);
+    /** set data object to pass to callback function */
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ret);
+    /** set the header callback function */
+    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, RestClient::header_callback);
+    /** callback object for headers */
+    curl_easy_setopt(curl, CURLOPT_HEADERDATA, &ret);
+    /** perform the actual query */
+    res = curl_easy_perform(curl);
+    if (res != CURLE_OK){
+      ret.body = "Failed to query.";
+      ret.code = -1;
+      return ret;
+    }
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    ret.code = static_cast<int>(http_code);
+    
+    curl_easy_cleanup(curl);
+    
+    if(headerChunk != NULL){
+      curl_slist_free_all(headerChunk);
+    }
+    curl_global_cleanup();
+  }
+
+  return ret;
 }
 
 RestClient::response RestClient::get(const RestClient::request& request, const std::ostream* outputFile)
 {
-    /** create return struct */
-    RestClient::response ret = RestClient::response();
-    
-    // use libcurl
-    CURL *curl = NULL;
-    CURLcode res = CURLE_OK;
-    struct curl_slist *headerChunk = NULL;
-    
-    curl = curl_easy_init();
-    if (curl)
-    {
-        /** set basic authentication if present*/
-        if(RestClient::user_pass.length()>0){
-          curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-          curl_easy_setopt(curl, CURLOPT_USERPWD, RestClient::user_pass.c_str());
-        }
-        
-        if(request.headers.size()>0){
-          headermap::const_iterator iterator;
-
-          for(iterator = request.headers.begin(); iterator != request.headers.end(); iterator++){
-            std::string value = iterator->first+": "+iterator->second;
-            
-            headerChunk = curl_slist_append(headerChunk, value.c_str());
-          }
-
-          curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerChunk);
-
-          if(request.headers.find("User-Agent") == request.headers.end()){
-            /** set user agent */
-            curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
-          }
-        } else {
-          /** set user agent */
-          curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
-        }
-
-        if(outputFile != NULL) {
-          ret.file = (std::ostream*)outputFile;
-        }
-
-        /** set query URL */
-        curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
-        /** set callback function */
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, RestClient::write_callback);
-        /** set data object to pass to callback function */
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ret);
-        /** set the header callback function */
-        curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, RestClient::header_callback);
-        /** callback object for headers */
-        curl_easy_setopt(curl, CURLOPT_HEADERDATA, &ret);
-        /** perform the actual query */
-        res = curl_easy_perform(curl);
-        if (res != CURLE_OK)
-        {
-            ret.body = "Failed to query.";
-            ret.code = -1;
-            return ret;
-        }
-        long http_code = 0;
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-        ret.code = static_cast<int>(http_code);
-        
-        curl_easy_cleanup(curl);
-        
-        if(headerChunk != NULL){
-            curl_slist_free_all(headerChunk);
-        }
-        curl_global_cleanup();
+  /** create return struct */
+  RestClient::response ret = RestClient::response();
+  
+  // use libcurl
+  CURL *curl = NULL;
+  CURLcode res = CURLE_OK;
+  struct curl_slist *headerChunk = NULL;
+  
+  curl = curl_easy_init();
+  if (curl)
+  {
+    /** set basic authentication if present*/
+    if(RestClient::user_pass.length()>0){
+      curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+      curl_easy_setopt(curl, CURLOPT_USERPWD, RestClient::user_pass.c_str());
     }
     
-    return ret;
+    if(request.headers.size()>0){
+      headermap::const_iterator iterator;
+      
+      for(iterator = request.headers.begin(); iterator != request.headers.end(); iterator++){
+        std::string value = iterator->first+": "+iterator->second;
+        
+        headerChunk = curl_slist_append(headerChunk, value.c_str());
+      }
+      
+      curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerChunk);
+      
+      if(request.headers.find("User-Agent") == request.headers.end()){
+        /** set user agent */
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
+      }
+    } else {
+      /** set user agent */
+      curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
+    }
+    
+    if(outputFile != NULL){
+      ret.file = (std::ostream*)outputFile;
+    }
+    
+    /** do not install signal handlers */
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
+    /** set query URL */
+    curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
+    /** set callback function */
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, RestClient::write_callback);
+    /** set data object to pass to callback function */
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ret);
+    /** set the header callback function */
+    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, RestClient::header_callback);
+    /** callback object for headers */
+    curl_easy_setopt(curl, CURLOPT_HEADERDATA, &ret);
+    /** perform the actual query */
+    res = curl_easy_perform(curl);
+    if (res != CURLE_OK){
+      ret.body = "Failed to query.";
+      ret.code = -1;
+      return ret;
+    }
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    ret.code = static_cast<int>(http_code);
+    
+    curl_easy_cleanup(curl);
+    
+    if(headerChunk != NULL){
+      curl_slist_free_all(headerChunk);
+    }
+    curl_global_cleanup();
+  }
+  
+  return ret;
 }
 
 /**

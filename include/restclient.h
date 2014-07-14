@@ -17,6 +17,15 @@
 #include <algorithm>
 #include <fstream>
 
+class RestClientTransferInfo
+{
+public:
+  virtual ~RestClientTransferInfo()
+  {};
+    
+  virtual int UpdateTransferInfo(long dltotal, long dlnow, long ultotal, long ulnow) = 0;
+};
+
 class RestClient
 {
   public:
@@ -24,12 +33,11 @@ class RestClient
      * public data definitions
      */
     typedef std::map<std::string, std::string> headermap;
-
     
     typedef struct request_s
     {
-        headermap headers;
-        std::string url;
+      headermap headers;
+      std::string url;
     } request;
     
     /** response struct for queries */
@@ -61,6 +69,8 @@ class RestClient
     // HTTP GET
     static response get(const request& request);
     static response get(const request& request, const std::ostream* outputFile);
+    static response get(const request& request, const std::ostream* outputFile, const RestClientTransferInfo& info);
+    
     static response get(const std::string& url);
     
     // HTTP POST
@@ -73,6 +83,8 @@ class RestClient
     static response del(const std::string& url);
 
   private:
+    static int TransferInfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow);
+    
     // writedata callback function
     static size_t write_callback(void *ptr, size_t size, size_t nmemb,
                                  void *userdata);

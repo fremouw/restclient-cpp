@@ -41,8 +41,6 @@ int RestClient::TransferInfo(void *p, curl_off_t dltotal, curl_off_t dlnow, curl
   int retValue = 0;
 
   if(info != NULL){
-    RestClientTransferInfo* info = (RestClientTransferInfo*)p;
-    
     retValue = info->UpdateTransferInfo(dltotal, dlnow, ultotal, ulnow);
   }
 
@@ -304,6 +302,110 @@ RestClient::response RestClient::post(const std::string& url,
 
   return ret;
 }
+
+RestClient::response RestClient::post(const request& request,
+                                      const std::map<std::string, formItem>& form)
+{
+    /** create return struct */
+    RestClient::response ret = RestClient::response();
+    
+    // use libcurl
+    CURL *curl = NULL;
+    CURLcode res = CURLE_OK;
+    struct curl_slist *headerChunk = NULL;
+    struct curl_httppost *formpost = NULL;
+    struct curl_httppost *lastptr = NULL;
+    
+    curl = curl_easy_init();
+    if (curl)
+    {
+        /** set basic authentication if present*/
+        if(RestClient::user_pass.length()>0){
+            curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+            curl_easy_setopt(curl, CURLOPT_USERPWD, RestClient::user_pass.c_str());
+        }
+        
+        if(request.headers.size()>0){
+            headermap::const_iterator iterator;
+            
+            for(iterator = request.headers.begin(); iterator != request.headers.end(); iterator++){
+                std::string value = iterator->first+": "+iterator->second;
+                
+                headerChunk = curl_slist_append(headerChunk, value.c_str());
+            }
+            
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerChunk);
+            
+            if(request.headers.find("User-Agent") == request.headers.end()){
+                /** set user agent */
+                curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
+            }
+        } else {
+            /** set user agent */
+            curl_easy_setopt(curl, CURLOPT_USERAGENT, RestClient::user_agent);
+        }
+ 
+        if(form.size()>0){
+            std::map<std::string,formItem>::const_iterator iterator;
+            
+            for(iterator = form.begin(); iterator != form.end(); iterator++){
+                std::string    name   = iterator->first;
+                formItem       item   = iterator->second;
+                CURLformoption option = CURLFORM_NOTHING;
+
+                switch(item.type)
+                {
+                    case kFile:
+                        option = CURLFORM_FILE;
+                        break;
+                    case kString:
+                        option = CURLFORM_COPYNAME;
+                        break;
+                };
+                
+                curl_formadd(&formpost,
+                             &lastptr,
+                             CURLFORM_COPYNAME, iterator->first.c_str(),
+                             option, item.value.c_str(),
+                             CURLFORM_END);
+            }
+
+            curl_easy_setopt(curl, CURLOPT_HTTPPOST, formpost);
+        }
+        
+        /** do not install signal handlers */
+        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
+        /** set query URL */
+        curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
+        /** Now specify we want to POST data */
+        //curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        /** set callback function */
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, RestClient::write_callback);
+        /** set data object to pass to callback function */
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ret);
+        /** set the header callback function */
+        curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, RestClient::header_callback);
+        /** callback object for headers */
+        curl_easy_setopt(curl, CURLOPT_HEADERDATA, &ret);
+        /** set content-type header */
+        /** perform the actual query */
+        res = curl_easy_perform(curl);
+        if (res != CURLE_OK)
+        {
+            ret.body = "Failed to query.";
+            ret.code = -1;
+            return ret;
+        }
+        long http_code = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+        ret.code = static_cast<int>(http_code);
+        
+        curl_easy_cleanup(curl);
+        curl_global_cleanup();
+    }
+    
+    return ret;
+}
 /**
  * @brief HTTP PUT method
  *
@@ -408,7 +510,7 @@ RestClient::response RestClient::del(const std::string& url)
   // use libcurl
   CURL *curl = NULL;
   CURLcode res = CURLE_OK;
-
+    
   curl = curl_easy_init();
   if (curl)
   {

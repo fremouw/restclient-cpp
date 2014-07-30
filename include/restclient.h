@@ -51,6 +51,19 @@ class RestClient
       response_s() : code(0), body(""), headers(), file(NULL)
       {}
     } response;
+    
+    
+    
+    /** */
+    typedef enum {
+        kString,
+        kFile,
+    } formType;
+    typedef struct {
+        std::string value;
+        formType type;
+    } formItem;
+    
     /** struct used for uploading data */
     typedef struct
     {
@@ -76,6 +89,10 @@ class RestClient
     // HTTP POST
     static response post(const std::string& url, const std::string& ctype,
                          const std::string& data);
+    
+    static response post(const request& request,
+                         const std::map<std::string, formItem>& form);
+
     // HTTP PUT
     static response put(const std::string& url, const std::string& ctype,
                         const std::string& data);

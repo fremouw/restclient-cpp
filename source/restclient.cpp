@@ -185,8 +185,8 @@ RestClient::Response RestClient::Post( const Request& request, const std::map<st
     CURLcode              curlResponse = CURLE_OK;
     long                  httpCode     = 0;
     struct curl_slist*    headerChunk  = NULL;
-    struct curl_httppost* formpost     = NULL;
-    struct curl_httppost* lastptr      = NULL;
+    struct curl_httppost* formPost     = NULL;
+    struct curl_httppost* lastPtr      = NULL;
 
     if( CurlSharedEasyInit( request, response ) )
     {
@@ -206,14 +206,14 @@ RestClient::Response RestClient::Post( const Request& request, const std::map<st
                         option = CURLFORM_FILE;
                         break;
                     case kString:
-                        option = CURLFORM_COPYNAME;
+                        option = CURLFORM_COPYCONTENTS;
                         break;
                 };
                 
-                curl_formadd( &formpost, &lastptr, CURLFORM_COPYNAME, iterator->first.c_str(), option, item.value.c_str(), CURLFORM_END );
+                curl_formadd( &formPost, &lastPtr, CURLFORM_COPYNAME, iterator->first.c_str(), option, item.value.c_str(), CURLFORM_END );
             }
             
-            curl_easy_setopt( response.curl, CURLOPT_HTTPPOST, formpost );
+            curl_easy_setopt( response.curl, CURLOPT_HTTPPOST, formPost );
         }
         
         curlResponse = curl_easy_perform( response.curl );

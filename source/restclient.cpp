@@ -33,6 +33,16 @@ void RestClient::SetAuth( const std::string& username, const std::string& passwo
     RestClient::UserPassword += username + ":" + password;
 }
 
+void RestClient::Init()
+{
+    curl_global_init( CURL_GLOBAL_ALL );
+}
+
+void RestClient::CleanUp()
+{
+    curl_global_cleanup();
+}
+
 bool RestClient::CurlSharedEasyInit( const RestClient::Request& request, RestClient::Response& response )
 {
     bool               retVal      = false;
@@ -103,8 +113,6 @@ bool RestClient::CurlSharedEasyCleanUp( RestClient::Response& response )
 
     response.curl        = NULL;
     response.headerChunk = NULL;
-
-    curl_global_cleanup();
     
     return true;
 }

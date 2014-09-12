@@ -76,6 +76,10 @@ class RestClient
         size_t      length;
     } UploadObject;
 
+    //
+    static void Init();
+    static void CleanUp();
+
     // Auth
     static void ClearAuth();
     static void SetAuth( const std::string& username, const std::string& password );
